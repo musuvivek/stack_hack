@@ -1,0 +1,6 @@
+Day,P1,P2,P3,P4,P5,P6,P7,P8
+Friday,C001 (F1) [lecture] @R001,C004 (F4) [lecture] @R004,C002 (F2) [lecture] @R005,C001 (F1) [lecture] @R008,BREAK,,C003 (F3) [lecture] @R001,
+Monday,,C006 (F6) [lecture] @R010,C003 (F3) [lecture] @R007,,BREAK,C009 (F9) [lab] @L003,C009 (F9) [lab] @L003,C009 (F9) [lab] @L003
+Thursday,C006 (F6) [lecture] @R012,C008 (F8) [lab] @L003,C008 (F8) [lab] @L003,C007 (F7) [lecture] @R001,BREAK,C010 (F10) [lab] @L005,C010 (F10) [lab] @L005,
+Tuesday,C001 (F1) [lecture] @R011,C003 (F3) [lecture] @R004,C005 (F5) [lecture] @R007,C002 (F2) [lecture] @R009,BREAK,C006 (F6) [lecture] @R005,C003 (F3) [lecture] @R006,C007 (F7) [lecture] @R003
+Wednesday,C007 (F7) [lecture] @R001,C004 (F4) [lecture] @R001,,C006 (F6) [lecture] @R008,BREAK,,C004 (F4) [lecture] @R003,C005 (F5) [lecture] @R001
