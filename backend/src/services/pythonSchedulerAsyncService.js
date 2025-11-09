@@ -34,8 +34,28 @@ async function appendLog(jobId, msg) {
 
 async function runAsync(jobId, payload, createdBy) {
   try {
-    await appendLog(jobId, 'Calling Python scheduler /api/solve ...');
-    const solver = await runSolver(payload);
+    const maxAttempts = Number(process.env.PYTHON_SCHEDULER_MAX_ATTEMPTS || 3);
+    const backoffMs = Number(process.env.PYTHON_SCHEDULER_RETRY_DELAY_MS || 10000);
+
+    let solver = null;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await appendLog(jobId, `Calling Python scheduler /api/solve (attempt ${attempt}/${maxAttempts}) ...`);
+      try {
+        solver = await runSolver(payload);
+        break;
+      } catch (e) {
+        lastErr = e;
+        const msg = e?.message || String(e);
+        await appendLog(jobId, `Attempt ${attempt} failed: ${msg}`);
+        if (attempt < maxAttempts) {
+          await appendLog(jobId, `Retrying in ${Math.round(backoffMs / 1000)}s ...`);
+          await new Promise((r) => setTimeout(r, backoffMs));
+        }
+      }
+    }
+    if (!solver) throw lastErr || new Error('Solver failed after retries');
+    await appendLog(jobId, `Solver returned status: ${solver.status || 'unknown'}`);
     await appendLog(jobId, `Solver returned status: ${solver.status || 'unknown'}`);
 
     // Build sections for timetable
