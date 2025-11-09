@@ -2,6 +2,8 @@ ortools>=9.9.3963
 pandas>=2.1.0
 pydantic>=1.10.14
 streamlit>=1.32.0
+ fastapi==0.115.6
+ uvicorn[standard]==0.30.0
  gunicorn
  pandas==2.2.2
  numpy==2.0.2
