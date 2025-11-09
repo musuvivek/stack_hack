@@ -115,6 +115,33 @@ router.post('/python-scheduler/run', async (req, res) => {
   }
 });
 
+// Async start: returns 202 with jobId and runs solver in background
+router.post('/python-scheduler/run-async', async (req, res) => {
+  try {
+    const { files, timeLimit = 90, optimizeGaps = false } = req.body || {};
+    if (!Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ message: 'files required' });
+    }
+    const { startPythonSchedulerJob } = require('../services/pythonSchedulerAsyncService');
+    const jobId = await startPythonSchedulerJob({ files, timeLimit, optimizeGaps }, req.user?.sub || 'admin');
+    return res.status(202).json({ jobId });
+  } catch (e) {
+    return res.status(500).json({ message: e?.message || 'Failed to start async solver' });
+  }
+});
+
+// Async status: get job status and summary
+router.get('/python-scheduler/run/:jobId/status', async (req, res) => {
+  try {
+    const { getPythonSchedulerStatus } = require('../services/pythonSchedulerAsyncService');
+    const status = await getPythonSchedulerStatus(req.params.jobId);
+    if (!status) return res.status(404).json({ message: 'Not found' });
+    return res.json(status);
+  } catch (e) {
+    return res.status(500).json({ message: 'Failed to fetch status' });
+  }
+});
+
 router.get('/python-scheduler/health', async (_req, res) => {
   try {
     const url = (process.env.PYTHON_SCHEDULER_URL || 'http://localhost:8000') + '/health';

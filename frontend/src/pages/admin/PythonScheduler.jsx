@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 const REQUIRED_FILES = [
   { key: 'day_worksheet.csv', label: 'day_worksheet.csv' },
@@ -27,8 +27,44 @@ export default function PythonScheduler() {
   const [optimizeGaps, setOptimizeGaps] = useState(false)
   const [files, setFiles] = useState({})
   const [running, setRunning] = useState(false)
+  const [jobId, setJobId] = useState(null)
+  const [jobStatus, setJobStatus] = useState(null)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
+
+  const pollStatus = useCallback(async (id) => {
+    if (!id) return
+    try {
+      const res = await fetch(`/api/admin/python-scheduler/run/${id}/status`, { credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.message || 'Failed to get status')
+      setJobStatus(data)
+      if (data.status === 'completed' || data.status === 'failed') {
+        setRunning(false)
+        if (data.status === 'completed') {
+          // The result is now part of the job status, so we can use it directly
+          const timetableId = data.resultSummary?.timetables?.[0]
+          if (timetableId) {
+            const ttRes = await fetch(`/api/admin/timetables/${timetableId}`, { credentials: 'include' })
+            const ttData = await ttRes.json()
+            setResult({ timetableId, solver: ttData })
+          }
+        } else if (data.status === 'failed') {
+          setError(data.logs?.join('\n') || 'Job failed')
+        }
+      }
+    } catch (e) {
+      setError(e.message)
+      setRunning(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (running && jobId) {
+      const interval = setInterval(() => pollStatus(jobId), 3000)
+      return () => clearInterval(interval)
+    }
+  }, [running, jobId, pollStatus])
 
   function onFileChange(name, file) {
     setFiles(prev => ({ ...prev, [name]: file }))
@@ -37,6 +73,8 @@ export default function PythonScheduler() {
   async function runScheduler() {
     setError('')
     setResult(null)
+    setJobId(null)
+    setJobStatus(null)
     const missing = REQUIRED_FILES.filter(f => !files[f.key])
     if (missing.length) {
       setError(`Missing files: ${missing.map(m => m.label).join(', ')}`)
@@ -52,18 +90,17 @@ export default function PythonScheduler() {
         const content = await fileToBase64(file)
         payloadFiles.push({ name: f.key, content })
       }
-      const res = await fetch('/api/admin/python-scheduler/run', {
+      const res = await fetch('/api/admin/python-scheduler/run-async', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ files: payloadFiles, timeLimit, optimizeGaps })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data?.message || 'Scheduler failed')
-      setResult(data)
+      if (!res.ok) throw new Error(data?.message || 'Scheduler failed to start')
+      setJobId(data.jobId)
     } catch (e) {
       setError(e.message)
-    } finally {
       setRunning(false)
     }
   }
@@ -221,12 +258,25 @@ export default function PythonScheduler() {
         </div>
       </div>
       <div className="actions" style={{ marginTop: '.75rem' }}>
-        <button className="btn btn-primary" onClick={runScheduler} disabled={running}>{running ? 'Running...' : 'Run Solver'}</button>
+        <button className="btn btn-primary" onClick={runScheduler} disabled={running}>{running ? `Running... (Job ${jobStatus?.status || 'started'})` : 'Run Solver'}</button>
       </div>
       {error && <p className="alert error" style={{ marginTop: '.5rem' }}>{error}</p>}
+      {jobStatus && (
+        <div className="card" style={{ marginTop: '1rem' }}>
+          <h3>Job Status: {jobStatus.status}</h3>
+          {jobStatus.logs && jobStatus.logs.length > 0 && (
+            <details>
+              <summary>Logs</summary>
+              <pre style={{ whiteSpace: 'pre-wrap', background: '#f4f4f4', padding: '1rem', borderRadius: '6px' }}>
+                {jobStatus.logs.join('\n')}
+              </pre>
+            </details>
+          )}
+        </div>
+      )}
       {result && (
         <div style={{ marginTop: '1rem' }}>
-          <h3>Solver Status: {result.solver?.status}</h3>
+          <h3>Solver Status: {result.solver?.status || jobStatus?.resultSummary?.status}</h3>
           {result.solver?.warnings?.length ? <p>Warnings: {result.solver.warnings.join(', ')}</p> : null}
           <div className="actions" style={{ margin: '.5rem 0' }}>
             <button className="btn btn-primary" onClick={publish}>Publish</button>
